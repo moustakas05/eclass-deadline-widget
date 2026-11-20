@@ -221,3 +221,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local eClass widget data & state
+*.db
+widget_state.json
+.vscode/settings.json
+run_scraper.bat
