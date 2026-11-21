@@ -1,0 +1,7 @@
+{
+  "url": "https://eclass.uowm.gr/",
+  "db_path": "eclass.db",
+  "timeout": 20,
+  "delay_seconds": 1.0,
+  "user_agent": "Mozilla/5.0 (eclass-deadline-scraper)"
+}
