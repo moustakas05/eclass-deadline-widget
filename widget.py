@@ -37,7 +37,7 @@ ACCENT = "#3b82f6"
 
 GLYPH_REFRESH = "\u21bb"
 GLYPH_CLOSE = "\u2715"
-GLYPH_BG = "\u25be"  # ▾ (Αποστολή στο παρασκήνιο)
+GLYPH_BG = "\u25be"
 
 
 @dataclass
@@ -170,7 +170,6 @@ class DeadlineWidget(ctk.CTk):
     super().__init__()
     self.settings = settings
     self.state_data = load_state()
-    # Προεπιλογή False ώστε να μπαίνει αυτόματα στο παρασκήνιο όταν είσαι σε άλλη εφαρμογή
     self.pinned = bool(self.state_data.get("pinned", False))
     self._signature = None
     self._cards: dict[int, tuple[Task, ctk.CTkLabel, ctk.CTkFrame]] = {}
@@ -199,7 +198,6 @@ class DeadlineWidget(ctk.CTk):
     self.protocol("WM_DELETE_WINDOW", self.close)
 
   def _bind_focus_behavior(self) -> None:
-    """Όταν χάνει το focus (πας σε άλλη εφαρμογή), μπαίνει στο παρασκήνιο αν δεν είναι Pin."""
     self.bind("<FocusOut>", self._on_focus_out)
     self.bind("<Button-1>", self._on_window_click, add="+")
 
@@ -207,10 +205,34 @@ class DeadlineWidget(ctk.CTk):
     if not self.pinned:
       self.after(50, self._check_and_lower)
 
+  def _win32_send_to_bottom(self) -> None:
+    if sys.platform == "win32":
+      try:
+        import ctypes
+
+        hwnd = ctypes.windll.user32.GetParent(self.winfo_id()) or self.winfo_id()
+        HWND_BOTTOM = 1
+        SWP_NOMOVE = 0x0002
+        SWP_NOSIZE = 0x0001
+        SWP_NOACTIVATE = 0x0010
+        ctypes.windll.user32.SetWindowPos(
+            hwnd,
+            HWND_BOTTOM,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        )
+        return
+      except Exception:
+        pass
+    self.lower()
+
   def _check_and_lower(self) -> None:
     try:
       if not self.pinned and self.focus_displayof() is None:
-        self.lower()
+        self._win32_send_to_bottom()
     except Exception:
       pass
 
@@ -219,13 +241,12 @@ class DeadlineWidget(ctk.CTk):
     self.focus_force()
 
   def send_to_background(self) -> None:
-    """Κουμπί παρασκηνίου: ξεκαρφιτσώνει το widget και το στέλνει πίσω από όλα τα παράθυρα."""
     if self.pinned:
       self.pinned = False
       self.attributes("-topmost", False)
       self._style_pin_button()
       self._persist_state()
-    self.lower()
+    self._win32_send_to_bottom()
 
   def _build_layout(self) -> None:
     shell = ctk.CTkFrame(
@@ -249,7 +270,6 @@ class DeadlineWidget(ctk.CTk):
     )
     self.count_label.pack(side="left")
 
-    # Κουμπί Κλεισίματος (✕)
     close_btn = ctk.CTkButton(
         header,
         text=GLYPH_CLOSE,
@@ -262,7 +282,6 @@ class DeadlineWidget(ctk.CTk):
     )
     close_btn.pack(side="right", padx=(0, 8))
 
-    # Κουμπί Αποστολής στο Παρασκήνιο (▾)
     bg_btn = ctk.CTkButton(
         header,
         text=GLYPH_BG,
@@ -276,7 +295,6 @@ class DeadlineWidget(ctk.CTk):
     )
     bg_btn.pack(side="right", padx=2)
 
-    # Κουμπί Χειροκίνητου Συγχρονισμού (↻ Sync)
     self.sync_btn = ctk.CTkButton(
         header,
         text=f"{GLYPH_REFRESH} Sync",
@@ -290,7 +308,6 @@ class DeadlineWidget(ctk.CTk):
     )
     self.sync_btn.pack(side="right", padx=2)
 
-    # Κουμπί Καρφιτσώματος (Pin)
     self.pin_btn = ctk.CTkButton(
         header,
         text="Pin",
@@ -317,7 +334,6 @@ class DeadlineWidget(ctk.CTk):
     self.footer.pack(fill="x", pady=(0, 4))
 
   def manual_sync(self) -> None:
-    """Εκτελεί τον scraper στο παρασκήνιο ώστε να ενημερωθούν οι εργασίες από το eClass."""
     if self._is_syncing:
       return
     self._is_syncing = True

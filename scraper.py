@@ -13,6 +13,11 @@ import re
 import sqlite3
 import sys
 import time
+import certifi
+
+os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup

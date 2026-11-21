@@ -3,3 +3,4 @@ beautifulsoup4
 customtkinter
 python-dotenv
 pyinstaller
+certifi
