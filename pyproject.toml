@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools==75.6.0", "wheel==0.45.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eclass-deadline-widget"
+version = "1.0.0"
+description = "Desktop widget for UOWM Open eClass deadlines"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "beautifulsoup4==4.12.3",
+  "customtkinter==5.2.2",
+  "python-dotenv==1.0.1",
+  "requests==2.32.3",
+  "urllib3==2.2.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.4"]
+
+[project.scripts]
+eclass-sync = "scraper:main"
+eclass-widget = "widget:main"
+
+[tool.setuptools]
+py-modules = ["scraper", "widget"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
