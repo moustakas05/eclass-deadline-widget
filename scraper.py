@@ -5,6 +5,7 @@ Open eClass deadline scraper -> SQLite
 
 from dataclasses import dataclass
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import json
 import logging
 import os
@@ -27,6 +28,7 @@ else:
 CONFIG_PATH = BASE_DIR / "config.json"
 
 log = logging.getLogger("eclass")
+LOCAL_TZ = ZoneInfo("Europe/Athens")
 
 NUMERIC_DATE_RE = re.compile(
     r"(\d{1,2}[-/.]\d{1,2}[-/.]\d{4})(?:\s*[-–]?\s*(\d{1,2}:\d{2}(?::\d{2})?))?"
@@ -85,10 +87,12 @@ class Config:
 
 
 def load_config(path: Path = CONFIG_PATH) -> Config:
-  if not path.exists():
-    sys.exit(f"Configuration file not found: {path}")
-  with path.open(encoding="utf-8") as f:
-    raw = json.load(f)
+  raw = {}
+  if path.exists():
+    with path.open(encoding="utf-8") as f:
+      raw = json.load(f)
+  if os.getenv("ECLASS_BASE_URL"):
+    raw["url"] = os.environ["ECLASS_BASE_URL"]
   if "url" not in raw:
     sys.exit("config.json must contain the key 'url'.")
   db_path = Path(raw.get("db_path", "eclass.db"))
@@ -120,6 +124,12 @@ class EClassClient:
   def __init__(self, cfg: Config):
     self.cfg = cfg
     self.session = requests.Session()
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+    retry = Retry(total=3, connect=3, read=2, backoff_factor=0.5, status_forcelist=(429, 500, 502, 503, 504), allowed_methods=frozenset({"GET"}))
+    adapter = HTTPAdapter(max_retries=retry)
+    self.session.mount("https://", adapter)
+    self.session.mount("http://", adapter)
     self.session.headers.update({"User-Agent": cfg.user_agent})
 
   def _get(self, url: str) -> BeautifulSoup:
@@ -211,7 +221,7 @@ def parse_date(text: str) -> datetime | None:
         if hour != 12:
           hour += 12
       try:
-        return datetime(year, month, day, hour, minute, second)
+        return datetime(year, month, day, hour, minute, second, tzinfo=LOCAL_TZ)
       except ValueError:
         pass
 
@@ -222,7 +232,7 @@ def parse_date(text: str) -> datetime | None:
   candidate = f"{date_part} {m.group(2)}" if m.group(2) else date_part
   for fmt in DATE_FORMATS:
     try:
-      return datetime.strptime(candidate, fmt)
+      return datetime.strptime(candidate, fmt).replace(tzinfo=LOCAL_TZ)
     except ValueError:
       continue
   return None
@@ -335,7 +345,7 @@ def init_db(path: str) -> sqlite3.Connection:
 def save(
     conn: sqlite3.Connection, code: str, title: str, items: list[dict]
 ) -> tuple[int, int]:
-  now = datetime.now().isoformat(timespec="seconds")
+  now = datetime.now(LOCAL_TZ).isoformat(timespec="seconds")
   conn.execute(
       "INSERT INTO courses (code, title) VALUES (?, ?) "
       "ON CONFLICT(code) DO UPDATE SET title = excluded.title",
