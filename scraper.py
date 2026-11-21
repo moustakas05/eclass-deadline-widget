@@ -1,3 +1,7 @@
+import os
+import certifi
+os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
+os.environ["SSL_CERT_FILE"] = certifi.where()
 # -*- coding: utf-8 -*-
 """
 Open eClass deadline scraper -> SQLite
@@ -13,10 +17,7 @@ import re
 import sqlite3
 import sys
 import time
-import certifi
 
-os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
-os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 
 from urllib.parse import urljoin
 
@@ -125,6 +126,8 @@ class EClassClient:
   def __init__(self, cfg: Config):
     self.cfg = cfg
     self.session = requests.Session()
+  session.verify = certifi.where()
+    self.session.verify = certifi.where()
     self.session.headers.update({"User-Agent": cfg.user_agent})
 
   def _get(self, url: str) -> BeautifulSoup:

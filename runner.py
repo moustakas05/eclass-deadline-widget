@@ -1,4 +1,8 @@
 import os
+import certifi
+os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
+os.environ["SSL_CERT_FILE"] = certifi.where()
+import os
 from pathlib import Path
 import subprocess
 import sys
