@@ -1,24 +1,32 @@
-import os
-import certifi
-os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
-os.environ["SSL_CERT_FILE"] = certifi.where()
 # -*- coding: utf-8 -*-
 """
 Open eClass deadline scraper -> SQLite
 """
+import truststore
+truststore.inject_into_ssl()
+import os
+from pathlib import Path
+import sys
+import certifi
+
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+  _bundled_ca = Path(sys._MEIPASS) / "cacert.pem"
+  CA_BUNDLE = str(_bundled_ca) if _bundled_ca.exists() else certifi.where()
+else:
+  CA_BUNDLE = certifi.where()
+
+os.environ["REQUESTS_CA_BUNDLE"] = CA_BUNDLE
+os.environ["SSL_CERT_FILE"] = CA_BUNDLE
 
 from dataclasses import dataclass
 from datetime import datetime
 import json
 import logging
-import os
 from pathlib import Path
 import re
 import sqlite3
 import sys
 import time
-
-
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -60,7 +68,7 @@ GREEK_MONTHS = {
 
 TEXT_DATE_RE = re.compile(
     r"(\d{1,2})\s+([A-Za-z\u0370-\u03ff\u1f00-\u1fff]+)\s+(\d{4})"
-    r"(?:\s*[-–]?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([πμΠΜ]\.?\s*[μΜ]\.?|am|pm)?)?",
+    r"(?:\s*[-–]?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(\u03c0\.?\s*\u03bc\.?|\u03bc\.?\s*\u03bc\.?|am|pm)?)?",
     re.IGNORECASE,
 )
 
@@ -74,7 +82,6 @@ DEADLINE_HEADERS = (
     "\u03c5\u03c0\u03bf\u03b2\u03bf\u03bb\u03ae",
 )
 
-# Επικεφαλίδα στήλης "Έχει υποβληθεί" / "Submitted"
 SUBMITTED_HEADERS = (
     "\u03c5\u03c0\u03bf\u03b2\u03bb\u03b7\u03b8\u03b5\u03af",
     "submitted",
@@ -126,8 +133,7 @@ class EClassClient:
   def __init__(self, cfg: Config):
     self.cfg = cfg
     self.session = requests.Session()
-  session.verify = certifi.where()
-    self.session.verify = certifi.where()
+    self.session.verify = CA_BUNDLE
     self.session.headers.update({"User-Agent": cfg.user_agent})
 
   def _get(self, url: str) -> BeautifulSoup:
@@ -241,11 +247,9 @@ def _is_cell_submitted(cell) -> bool:
   html_str = str(cell).lower()
   text_str = cell.get_text(" ", strip=True).lower()
 
-  # Αν έχει κλεψύδρα ή Χ, σίγουρα ΔΕΝ έχει υποβληθεί
   if any(k in html_str for k in ("hourglass", "fa-times", "fa-xmark", "danger")):
     return False
 
-  # Αν έχει εικονίδιο check / πράσινο success ή θετικό κείμενο, έχει υποβληθεί
   if any(k in html_str for k in ("fa-check", "check-circle", "text-success", "success")):
     return True
   if text_str in ("\u03bd\u03b1\u03b9", "yes", "\u03c5\u03c0\u03bf\u03b2\u03bb\u03ae\u03b8\u03b7\u03ba\u03b5", "submitted"):
@@ -289,7 +293,6 @@ def parse_assignments(soup: BeautifulSoup, page_url: str) -> list[dict]:
       if submitted_idx is not None and submitted_idx < len(cells):
         submitted = _is_cell_submitted(cells[submitted_idx])
       else:
-        # Fallback: ελέγχουμε τα υπόλοιπα κελιά της γραμμής για check icon
         submitted = any(_is_cell_submitted(c) for c in cells)
 
       deadline = None
@@ -353,7 +356,6 @@ def save(
   removed = 0
   for it in items:
     if it.get("submitted"):
-      # Αν έχει ήδη υποβληθεί, τη διαγράφουμε από τη βάση ώστε να εξαφανιστεί από το widget
       cur = conn.execute(
           "DELETE FROM deadlines WHERE course_code = ? AND title = ?",
           (code, it["title"]),

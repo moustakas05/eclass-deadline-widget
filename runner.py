@@ -1,3 +1,5 @@
+import truststore
+truststore.inject_into_ssl()
 import os
 import certifi
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
