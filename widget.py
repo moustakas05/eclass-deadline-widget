@@ -6,6 +6,7 @@ Desktop deadline widget (CustomTkinter) for the eClass scraper database.
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import json
 from pathlib import Path
 import sqlite3
@@ -16,6 +17,7 @@ import webbrowser
 import customtkinter as ctk
 import scraper
 
+LOCAL_TZ = ZoneInfo("Europe/Athens")
 if getattr(sys, "frozen", False):
   BASE_DIR = Path(sys.executable).resolve().parent
 else:
@@ -138,6 +140,8 @@ def load_tasks(settings: Settings, now: datetime) -> list[Task]:
   for row_id, course, title, deadline, url in rows:
     try:
       parsed = datetime.fromisoformat(deadline)
+      if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=LOCAL_TZ)
     except ValueError:
       continue
     tasks.append(Task(row_id, course, title, parsed, url))
@@ -342,7 +346,7 @@ class DeadlineWidget(ctk.CTk):
       self.footer.configure(text=error_msg[:55], text_color=RED)
     else:
       self.refresh()
-      now_str = datetime.now().strftime("%H:%M:%S")
+      now_str = datetime.now(LOCAL_TZ).strftime("%H:%M:%S")
       self.footer.configure(text=f"Synced at {now_str}", text_color=GREEN)
 
   def _start_drag(self, event) -> None:
@@ -384,7 +388,7 @@ class DeadlineWidget(ctk.CTk):
   def refresh(self) -> None:
     if self._after_id is not None:
       self.after_cancel(self._after_id)
-    now = datetime.now()
+    now = datetime.now(LOCAL_TZ)
     message = None
     tasks: list[Task] = []
     try:
