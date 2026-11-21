@@ -227,3 +227,9 @@ __marimo__/
 widget_state.json
 .vscode/settings.json
 run_scraper.bat
+
+# Local secrets, config and runtime state
+.env
+.env.*
+!.env.example
+config.json
